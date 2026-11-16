@@ -59,15 +59,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
        exit;
    }
 }
-$cafes = $pdo->query(
-   "SELECT cafe.*,
-           a.username AS added_by_name,
-           u.username AS updated_by_name
-    FROM cafe
-    LEFT JOIN users a ON cafe.added_by = a.user_id
-    LEFT JOIN users u ON cafe.updated_by = u.user_id
-    ORDER BY cafe.cafe_id DESC"
-)->fetchAll(PDO::FETCH_ASSOC);
+$search = trim($_GET["search"] ?? "");
+$sql = "SELECT cafe.*,
+               a.username AS added_by_name,
+               u.username AS updated_by_name
+        FROM cafe
+        LEFT JOIN users a ON cafe.added_by = a.user_id
+        LEFT JOIN users u ON cafe.updated_by = u.user_id";
+$params = [];
+if ($search !== "") {
+    $sql .= " WHERE cafe.cafe_name LIKE ? OR cafe.address LIKE ?";
+    $params = ["%$search%", "%$search%"];
+}
+$sql .= " ORDER BY cafe.cafe_id DESC";
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$cafes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -108,12 +115,21 @@ $cafes = $pdo->query(
            <a class="button secondary" href="cafe.php">Cancel</a>
        <?php endif; ?>
    </form>
+   <form method="GET" class="form-card">
+    <label>Search Cafe</label>
+    <input type="text" name="search" value="<?= e($search) ?>" placeholder="Search by name or address">
+    <button type="submit">Search</button>
+    <?php if ($search !== ""): ?>
+        <a class="button secondary" href="cafe.php">Clear</a>
+    <?php endif; ?>
+</form>
    <h2>Cafe Records</h2>
    <div class="table-wrap">
        <table>
            <tr>
                <th>ID</th>
                <th>Cafe Name</th>
+               <th>Date Added</th>
                <th>Address</th>
                <th>Added By</th>
                <th>Last Updated By</th>
@@ -124,6 +140,7 @@ $cafes = $pdo->query(
            <tr>
                <td><?= e($cafe["cafe_id"]) ?></td>
                <td><?= e($cafe["cafe_name"]) ?></td>
+               <td><?= e($cafe["date_added"]) ?></td>
                <td><?= e($cafe["address"]) ?></td>
                <td><?= e($cafe["added_by_name"] ?? "-") ?></td>
                <td><?= e($cafe["updated_by_name"] ?? "-") ?></td>
