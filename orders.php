@@ -1,4 +1,4 @@
-<?php
+v<?php
 session_start();
 if (!isset($_SESSION["user_id"])) {
    header("Location: login.php");
@@ -85,16 +85,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 $cafes = $pdo->query(
    "SELECT * FROM cafe ORDER BY cafe_name"
 )->fetchAll(PDO::FETCH_ASSOC);
-$orders = $pdo->query(
-   "SELECT orders.*, cafe.cafe_name,
-           a.username AS added_by_name,
-           u.username AS updated_by_name
-    FROM orders
-    INNER JOIN cafe ON orders.cafe_id = cafe.cafe_id
-    LEFT JOIN users a ON orders.added_by = a.user_id
-    LEFT JOIN users u ON orders.updated_by = u.user_id
-    ORDER BY orders.order_id DESC"
-)->fetchAll(PDO::FETCH_ASSOC);
+$search = trim($_GET["search"] ?? "");
+$sql = "SELECT orders.*, cafe.cafe_name,
+               a.username AS added_by_name,
+               u.username AS updated_by_name
+        FROM orders
+        INNER JOIN cafe ON orders.cafe_id = cafe.cafe_id
+        LEFT JOIN users a ON orders.added_by = a.user_id
+        LEFT JOIN users u ON orders.updated_by = u.user_id";
+$params = [];
+if ($search !== "") {
+    $sql .= " WHERE orders.customer_name LIKE ?
+              OR cafe.cafe_name LIKE ?
+              OR orders.order_date LIKE ?";
+    $params = ["%$search%", "%$search%", "%$search%"];
+}
+$sql .= " ORDER BY orders.order_id DESC";
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -154,6 +163,14 @@ $orders = $pdo->query(
        <?php endif; ?>
    </form>
    <?php endif; ?>
+   <form method="GET" class="form-card">
+    <label>Search Order</label>
+    <input type="text" name="search" value="<?= e($search) ?>" placeholder="Search by customer, cafe, or date">
+    <button type="submit">Search</button>
+    <?php if ($search !== ""): ?>
+        <a class="button secondary" href="orders.php">Clear</a>
+    <?php endif; ?>
+</form>
    <h2>Order Records</h2>
    <div class="table-wrap">
        <table>
@@ -163,6 +180,7 @@ $orders = $pdo->query(
                <th>Customer</th>
                <th>Amount</th>
                <th>Cafe</th>
+               <th>Date Added</th>
                <th>Added By</th>
                <th>Last Updated By</th>
                <th>Last Updated</th>
@@ -174,6 +192,7 @@ $orders = $pdo->query(
                <td><?= e($order["order_date"]) ?></td>
                <td><?= e($order["customer_name"]) ?></td>
                <td>₱<?= number_format((float)$order["total_amount"], 2) ?></td>
+               <td><?= e($order["date_added"]) ?></td>
                <td><?= e($order["cafe_name"]) ?></td>
                <td><?= e($order["added_by_name"] ?? "-") ?></td>
                <td><?= e($order["updated_by_name"] ?? "-") ?></td>
